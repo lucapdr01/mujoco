@@ -13,6 +13,12 @@ Engine
   a different material point, and the contact force exerted a spurious torque on the element. This changes the
   simulation of models with flex contacts.
 
+Python bindings
+^^^^^^^^^^^^^^^
+- The :ref:`managed viewer<PyViewerManaged>` accepts the ``mjSpec`` which the model was compiled from, as
+  ``viewer.launch(model, spec=spec)``. The "Save XML" button then saves the model from this spec, which previously
+  failed with "No XML model loaded" for models that were not loaded from an XML file (:issue:`2728`).
+
 Version 3.17.0 (October 22, 2026)
 ---------------------------------
 

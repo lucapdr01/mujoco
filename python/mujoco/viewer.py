@@ -56,7 +56,13 @@ KeyCallbackType = Callable[[int], None]
 
 # Loader function that also returns a file path for the GUI to display.
 _LoaderWithPathType = Callable[[], Tuple[mujoco.MjModel, mujoco.MjData, str]]
-_InternalLoaderType = Union[LoaderType, _LoaderWithPathType]
+# Loader function that also returns a file path and the spec of the model.
+_LoaderWithSpecType = Callable[
+    [], Tuple[mujoco.MjModel, mujoco.MjData, str, Optional[mujoco.MjSpec]]
+]
+_InternalLoaderType = Union[
+    LoaderType, _LoaderWithPathType, _LoaderWithSpecType
+]
 
 _Simulate = _simulate.Simulate
 
@@ -290,6 +296,23 @@ def _file_loader(path: str) -> _LoaderWithPathType:
   return load
 
 
+def _model_loader(
+    model: mujoco.MjModel,
+    data: Optional[mujoco.MjData] = None,
+    spec: Optional[mujoco.MjSpec] = None,
+) -> _LoaderWithSpecType:
+  """Loads a given mjModel, and its spec if given."""
+
+  def load(
+      m=model, d=data, s=spec
+  ) -> Tuple[mujoco.MjModel, mujoco.MjData, str, Optional[mujoco.MjSpec]]:
+    if d is None:
+      d = mujoco.MjData(m)
+    return m, d, '', s
+
+  return load
+
+
 def _reload(
     simulate: _Simulate,
     loader: _InternalLoaderType,
@@ -311,8 +334,9 @@ def _reload(
     # possible segmentation faults.
     assert m is not None and d is not None
 
-    path = load_tuple[2] if len(load_tuple) == 3 else ''
-    simulate.load(m, d, path)
+    path = load_tuple[2] if len(load_tuple) >= 3 else ''
+    spec = load_tuple[3] if len(load_tuple) >= 4 else None
+    simulate.load(m, d, path, spec)
 
     # Make sure any load_error message is cleared
     simulate.load_error = ''
@@ -451,6 +475,7 @@ def _launch_internal(
     *,
     run_physics_thread: bool,
     loader: Optional[_InternalLoaderType] = None,
+    spec: Optional[mujoco.MjSpec] = None,
     handle_return: Optional['queue.Queue[Handle]'] = None,
     key_callback: Optional[KeyCallbackType] = None,
     show_left_ui: bool = True,
@@ -467,15 +492,15 @@ def _launch_internal(
     raise ValueError('model and loader are both specified')
   elif run_physics_thread and handle_return is not None:
     raise ValueError('run_physics_thread and handle_return are both specified')
+  elif spec is not None and loader is not None:
+    raise ValueError('spec and loader are both specified')
+  elif spec is not None and model is None:
+    raise ValueError('mjSpec is specified but mjModel is not')
+  elif spec is not None and not isinstance(spec, mujoco.MjSpec):
+    raise ValueError(f'`spec` is not a mujoco.MjSpec: got {spec!r}')
 
   if loader is None and model is not None:
-
-    def _loader(m=model, d=data) -> Tuple[mujoco.MjModel, mujoco.MjData]:
-      if d is None:
-        d = mujoco.MjData(m)
-      return m, d
-
-    loader = _loader
+    loader = _model_loader(model, data, spec)
 
   cam = mujoco.MjvCamera()
   opt = mujoco.MjvOption()
@@ -533,6 +558,7 @@ def launch(
     data: Optional[mujoco.MjData] = None,
     *,
     loader: Optional[LoaderType] = None,
+    spec: Optional[mujoco.MjSpec] = None,
     show_left_ui: bool = True,
     show_right_ui: bool = True,
 ) -> None:
@@ -542,6 +568,7 @@ def launch(
       data,
       run_physics_thread=True,
       loader=loader,
+      spec=spec,
       show_left_ui=show_left_ui,
       show_right_ui=show_right_ui,
   )

@@ -28,6 +28,7 @@
 #include <Python.h>
 #include "errors.h"
 #include "indexers.h"
+#include "specs_wrapper.h"
 #include "structs.h"
 #include <pybind11/gil.h>
 #include <pybind11/pybind11.h>
@@ -105,16 +106,19 @@ class SimulateWrapper {
     WaitForAtomicNoGil(simulate_->exitrequest, 2);
   }
 
-  void Load(py::object m, py::object d, const std::string& path) {
+  void Load(py::object m, py::object d, const std::string& path,
+            py::object spec) {
     if (!simulate_) {
       return;
     }
 
     mjModel* m_raw = m.cast<MjModelWrapper&>().get();
     mjData* d_raw = d.cast<MjDataWrapper&>().get();
+    const mjSpec* spec_raw =
+        spec.is_none() ? nullptr : spec.cast<MjSpec&>().ptr;
     {
       py::gil_scoped_release no_gil;
-      simulate_->Load(m_raw, d_raw, path.c_str());
+      simulate_->Load(m_raw, d_raw, path.c_str(), spec_raw);
     }
     m_ = m;
     d_ = d;
@@ -348,7 +352,8 @@ PYBIND11_MODULE(_simulate, pymodule, pybind11::mod_gil_not_used()) {
       .def("destroy", &SimulateWrapper::Destroy)
       .def("load_message", CallIfNotNull(&mujoco::Simulate::LoadMessage),
            py::call_guard<py::gil_scoped_release>())
-      .def("load", &SimulateWrapper::Load)
+      .def("load", &SimulateWrapper::Load, py::arg("m"), py::arg("d"),
+           py::arg("path"), py::arg("spec") = py::none())
       .def("load_message_clear",
            CallIfNotNull(&mujoco::Simulate::LoadMessageClear),
            py::call_guard<py::gil_scoped_release>())

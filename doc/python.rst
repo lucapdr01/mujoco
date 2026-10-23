@@ -68,6 +68,10 @@ plugins<exPlugin>` or :ref:`physics callbacks<glPhysics>`, and is called by MuJo
 - ``viewer.launch(model, data)`` is the same as above, except that the visualizer operates directly on the given
   ``mjData`` instance -- upon exit the ``data`` object will have been modified.
 
+The "Save XML" button of the viewer requires the model to have been loaded from an XML file. For a model compiled from
+an :ref:`mjSpec<PyModelEdit>`, pass the spec as well with ``viewer.launch(model, spec=spec)``: the model is then saved
+from a copy of the spec.
+
 .. _PyViewerApp:
 
 Standalone app
