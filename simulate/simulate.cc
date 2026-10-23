@@ -2082,6 +2082,20 @@ void UiEvent(mjuiState* state) {
     return;
   }
 }
+
+// save model as MJCF, return true on success
+//  with a spec, the model's values (which can be modified in the GUI) are copied back to it first;
+//  without one, the model must have been loaded from an XML file, see mj_saveLastXML
+bool SaveXML(const char* filename, const mjModel* m, mjSpec* spec, char* error, int error_sz) {
+  if (!spec) {
+    return mj_saveLastXML(filename, m, error, error_sz);
+  }
+  if (!mj_copyBack(spec, m)) {
+    std::snprintf(error, error_sz, "%s", mjs_getError(spec));
+    return false;
+  }
+  return mj_saveXML(spec, filename, error, error_sz) == 0;
+}
 }  // namespace
 
 namespace mujoco {
@@ -2197,9 +2211,10 @@ void Simulate::Sync(bool state_only) {
   }
 
   if (pending_.save_xml) {
-    char err[200];
-    if (!pending_.save_xml->empty() && !mj_saveLastXML(pending_.save_xml->c_str(), m_, err, 200)) {
-      std::printf("Save XML error: %s", err);
+    char err[200] = "";
+    if (!pending_.save_xml->empty() &&
+        !SaveXML(pending_.save_xml->c_str(), m_, spec_.get(), err, sizeof(err))) {
+      std::printf("Save XML error: %s\n", err);
     }
     pending_.save_xml = std::nullopt;
   }
@@ -2429,9 +2444,10 @@ void Simulate::LoadMessage(const char* displayed_filename) {
   }
 }
 
-void Simulate::Load(mjModel* m, mjData* d, const char* displayed_filename) {
+void Simulate::Load(mjModel* m, mjData* d, const char* displayed_filename, const mjSpec* spec) {
   this->mnew_ = m;
   this->dnew_ = d;
+  this->spec_new_.reset(spec ? mj_copySpec(spec) : nullptr);
   mju::strcpy_arr(this->filename, displayed_filename);
 
   {
@@ -2457,6 +2473,7 @@ void Simulate::LoadMessageClear(void) {
 void Simulate::LoadOnRenderThread() {
   this->m_ = this->mnew_;
   this->d_ = this->dnew_;
+  this->spec_ = std::move(this->spec_new_);
 
   ncam_ = this->m_->ncam;
   nkey_ = this->m_->nkey;

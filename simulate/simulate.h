@@ -70,7 +70,9 @@ class Simulate {
   void LoadMessage(const char* displayed_filename);
 
   // Request that the Simulate UI thread render a new model
-  void Load(mjModel* m, mjData* d, const char* displayed_filename);
+  // If spec is not null it must be the spec that m was compiled from: a copy of it is kept and used
+  // to save the model as XML, which otherwise requires m to be loaded from an XML file
+  void Load(mjModel* m, mjData* d, const char* displayed_filename, const mjSpec* spec = nullptr);
 
   // Clear the loading message
   // Can be called instead of Load to clear the message without
@@ -106,6 +108,13 @@ class Simulate {
 
   mjModel* m_ = nullptr;
   mjData*  d_ = nullptr;
+
+  // copies of the specs that mnew_ and m_ were compiled from, if given to Load
+  struct SpecDeleter {
+    void operator()(mjSpec* s) const { mj_deleteSpec(s); }
+  };
+  std::unique_ptr<mjSpec, SpecDeleter> spec_new_;
+  std::unique_ptr<mjSpec, SpecDeleter> spec_;
 
   int ncam_           = 0;
   int nkey_           = 0;
